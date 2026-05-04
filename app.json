@@ -1,0 +1,5 @@
+{
+  "name": "app-venstar",
+  "description": "Normal Framework driver for Venstar VYG-4900 ColorTouch thermostats",
+  "version": "1.0.0"
+}

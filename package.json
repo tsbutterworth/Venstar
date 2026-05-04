@@ -1,0 +1,20 @@
+{
+  "name": "app-venstar",
+  "version": "1.0.0",
+  "description": "Normal Framework driver for Venstar VYG-4900 ColorTouch thermostats",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "configure": "npx applications-sdk configure",
+    "deploy": "npx applications-sdk deploy"
+  },
+  "dependencies": {
+    "@normalframework/applications-sdk": "0.1.96",
+    "@grpc/grpc-js": "*",
+    "@buf/normalframework_nf.grpc_node": "1.13.0-20250528015943-bda79e821714.1",
+    "axios": "^1.6.0",
+    "uuid": "*"
+  },
+  "author": "",
+  "license": "ISC"
+}
