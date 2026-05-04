@@ -1,0 +1,6 @@
+{
+  "id": "c7e2a841-5f3d-4b1a-9d8e-2f6c0e3a7b94",
+  "name": "import-points-venstar",
+  "entryPoint": "/hooks/import-points-venstar.js",
+  "invokeTimeout": "12900s"
+}

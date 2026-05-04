@@ -1,0 +1,10 @@
+{
+  "id": "d4f1b629-8a7e-4c2d-b3f5-1e9a0c6d8f27",
+  "name": "poll-values-venstar",
+  "entryPoint": "/hooks/poll-values-venstar.js",
+  "schedule": {
+    "rrule": "DTSTART:20260101T000000Z\nRRULE:FREQ=MINUTELY;INTERVAL=1"
+  },
+  "mode": "MODE_SCHEDULED",
+  "invokeTimeout": "55s"
+}
