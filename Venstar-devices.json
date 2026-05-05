@@ -1,0 +1,16 @@
+[
+  { "url": "http://10.205.81.248",  "name": "Buckhorn_Venstar_Bldg06_Rm613" },
+  { "url": "http://10.206.49.203",  "name": "Carrollwood_Venstar_Bldg17_Rm030" },
+  { "url": "http://10.207.177.223", "name": "Crestwood_Venstar_Bldg13_Rm220" },
+  { "url": "http://10.226.177.176", "name": "Woodson_Venstar_Bldg95_Rm359" },
+  { "url": "http://10.217.113.238", "name": "Ferrell_Venstar_Bldg6_Rm015c" },
+  { "url": "http://10.210.209.212", "name": "Grady_Venstar_Bldg06_Rm015c" },
+  { "url": "http://10.212.241.243", "name": "Kingswood_Venstar_Bldg02_Rm208" },
+  { "url": "http://10.213.81.210",  "name": "Lanier_Venstar_Bldg01_Rm301b" },
+  { "url": "http://10.215.49.194",  "name": "Lutz_Venstar_Bldg15_Rm903" },
+  { "url": "http://10.216.209.137", "name": "McLane_Venstar_Bldg03_Rm121" },
+  { "url": "http://10.221.81.201",  "name": "Riverview_Venstar_Bldg01_Rm027" },
+  { "url": "http://10.221.81.220",  "name": "Riverview_Venstar_Bldg04_Rm425" },
+  { "url": "http://10.222.81.214",  "name": "Ruskin_Venstar_Bldg16_Rm131" },
+  { "url": "http://10.227.113.246", "name": "WestShore_Venstar_Bldg95_Rm044" }
+]
