@@ -1,6 +1,51 @@
 {
-  "name": "app-venstar",
-  "description": "Normal Framework driver for Venstar VYG-4900 ColorTouch thermostats",
-  "version": "1.0.0",
-  "minVersion": "3.9.8-4"
+  "name": "Venstar VYG-4900 ColorTouch Driver",
+  "options": [
+    {
+      "name": "baseUrl",
+      "optionType": "TYPE_STRING",
+      "required": true
+    },
+    {
+      "name": "username",
+      "optionType": "TYPE_STRING"
+    },
+    {
+      "name": "password",
+      "optionType": "TYPE_STRING",
+      "secret": true
+    }
+  ],
+  "layer": {
+    "name": "hpl:venstar",
+    "indexed": true,
+    "defaultDisplayAttrs": [
+      "tstatName",
+      "venstar/key",
+      "units"
+    ],
+    "structuredComponents": [
+      {
+        "name": "tstatName",
+        "type": "TAG"
+      },
+      {
+        "name": "tstatUrl",
+        "type": "TAG"
+      },
+      {
+        "name": "venstar/key",
+        "type": "TAG"
+      },
+      {
+        "name": "venstar/source",
+        "type": "TAG"
+      },
+      {
+        "name": "units",
+        "type": "TAG"
+      }
+    ]
+  },
+  "minNfVersion": "3.9.8-4"
 }
