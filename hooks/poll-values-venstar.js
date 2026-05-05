@@ -27,12 +27,12 @@ module.exports = async ({ sdk, config, points }) => {
 
   const tstatGroups = {};
   for (const point of points) {
-    let tstatBase = point.attrs?.tstatUrl?.value;
+    let tstatBase = point.attrs?.tstatUrl;
     if (!tstatBase && point.parent_uuid) tstatBase = namespaceMap[point.parent_uuid];
     if (!tstatBase) continue;
 
     if (!tstatGroups[tstatBase]) tstatGroups[tstatBase] = { info: [], sensors: [], runtimes: [] };
-    const source = point.attrs?.["venstar/source"]?.value || "info";
+    const source = point.attrs?.["venstar/source"] || "info";
     tstatGroups[tstatBase][source].push(point);
   }
 
@@ -56,7 +56,7 @@ module.exports = async ({ sdk, config, points }) => {
           [`${tstatBase}/schedulepart`]: info.schedulepart,
         };
         for (const point of groups.info) {
-          const key = point.attrs?.["venstar/key"]?.value;
+          const key = point.attrs?.["venstar/key"];
           const val = infoValues[key];
           if (val !== undefined && val !== null) {
             updates.push({ uuid: point.uuid, layer: LAYER, value: String(val) });
@@ -72,7 +72,7 @@ module.exports = async ({ sdk, config, points }) => {
         const res = await axios.get(`${tstatBase}/query/sensors`, { ...authOpts, timeout: 10000 });
         const sensors = res.data?.sensors || [];
         for (const point of groups.sensors) {
-          const idx = parseInt(point.attrs?.["venstar/sensorIndex"]?.value, 10);
+          const idx = parseInt(point.attrs?.["venstar/sensorIndex"], 10);
           if (!isNaN(idx) && sensors[idx] !== undefined && sensors[idx].temp !== undefined) {
             updates.push({ uuid: point.uuid, layer: LAYER, value: String(sensors[idx].temp) });
           }
@@ -89,7 +89,7 @@ module.exports = async ({ sdk, config, points }) => {
         const latest = runtimes[runtimes.length - 1];
         if (latest) {
           for (const point of groups.runtimes) {
-            const rk = point.attrs?.["venstar/runtimeKey"]?.value;
+            const rk = point.attrs?.["venstar/runtimeKey"];
             if (rk && latest[rk] !== undefined) {
               updates.push({ uuid: point.uuid, layer: LAYER, value: String(latest[rk]) });
             }
