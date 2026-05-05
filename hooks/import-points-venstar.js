@@ -6,7 +6,7 @@ const path = require("path");
 
 const ROOT_NAMESPACE = "b9f3c721-4e8a-5d2b-a1f6-3c7e0d9b2f45";
 const LAYER = "hpl:venstar";
-const DEVICES_FILE = path.join(__dirname, "../venstar-devices.json");
+const DEVICES_FILE = path.join(__dirname, "../Venstar-devices.json");
 
 /**
  * Invoke hook function
