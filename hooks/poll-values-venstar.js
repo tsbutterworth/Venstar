@@ -1,9 +1,12 @@
 const NormalSdk = require("@normalframework/applications-sdk");
 const { v5: uuidv5 } = require("uuid");
 const axios = require("axios");
+const fs = require("fs");
+const path = require("path");
 
 const ROOT_NAMESPACE = "b9f3c721-4e8a-5d2b-a1f6-3c7e0d9b2f45";
 const LAYER = "hpl:venstar";
+const DEVICES_FILE = path.join(__dirname, "../venstar-devices.json");
 
 /**
  * Invoke hook function
@@ -11,17 +14,31 @@ const LAYER = "hpl:venstar";
  * @returns {NormalSdk.InvokeResult}
  */
 module.exports = async ({ sdk, config, points }) => {
-  if (!config.baseUrl) {
-    return NormalSdk.InvokeError("missing baseUrl in configuration");
+  // Build namespace map from venstar-devices.json + optional config.baseUrl
+  let devices = [];
+  try {
+    const raw = fs.readFileSync(DEVICES_FILE, "utf8");
+    devices = JSON.parse(raw);
+  } catch (err) {
+    sdk.logEvent(`[venstar] Could not read venstar-devices.json: ${err.message}`);
   }
 
-  const tstatUrls = config.baseUrl.split(",").map(u => u.trim()).filter(Boolean);
+  if (config.baseUrl) {
+    const overrideUrls = config.baseUrl.split(",").map(u => u.trim()).filter(Boolean);
+    for (const url of overrideUrls) {
+      if (!devices.find(d => d.url === url)) {
+        devices.push({ url, name: url });
+      }
+    }
+  }
+
   const username = config.username || "";
   const password = config.password || "";
   const authOpts = username ? { auth: { username, password } } : {};
 
   const namespaceMap = {};
-  for (const url of tstatUrls) {
+  for (const device of devices) {
+    const url = device.url.replace(/\/+$/, "");
     namespaceMap[uuidv5(url, ROOT_NAMESPACE)] = url;
   }
 
@@ -73,7 +90,7 @@ module.exports = async ({ sdk, config, points }) => {
         const sensors = res.data?.sensors || [];
         for (const point of groups.sensors) {
           const idx = parseInt(point.attrs?.["venstar/sensorIndex"], 10);
-          if (!isNaN(idx) && sensors[idx] !== undefined && sensors[idx].temp !== undefined) {
+          if (!isNaN(idx) && sensors[idx]?.temp !== undefined) {
             updates.push({ uuid: point.uuid, layer: LAYER, value: String(sensors[idx].temp) });
           }
         }
