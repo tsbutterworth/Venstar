@@ -1,5 +1,6 @@
 {
   "name": "Venstar VYG-4900 ColorTouch Driver",
+  "minNfVersion": "3.9.8-4",
   "options": [
     {
       "name": "baseUrl",
@@ -15,37 +16,5 @@
       "optionType": "TYPE_STRING",
       "secret": true
     }
-  ],
-  "layer": {
-    "name": "hpl:venstar",
-    "indexed": true,
-    "defaultDisplayAttrs": [
-      "tstatName",
-      "venstar/key",
-      "units"
-    ],
-    "structuredComponents": [
-      {
-        "name": "tstatName",
-        "type": "TAG"
-      },
-      {
-        "name": "tstatUrl",
-        "type": "TAG"
-      },
-      {
-        "name": "venstar/key",
-        "type": "TAG"
-      },
-      {
-        "name": "venstar/source",
-        "type": "TAG"
-      },
-      {
-        "name": "units",
-        "type": "TAG"
-      }
-    ]
-  },
-  "minNfVersion": "3.9.8-4"
+  ]
 }
