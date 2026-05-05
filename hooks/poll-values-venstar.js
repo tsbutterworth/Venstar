@@ -1,30 +1,26 @@
-const { v5: uuidv5 } = require('uuid');
-const axios = require('axios');
+const NormalSdk = require("@normalframework/applications-sdk");
+const { v5: uuidv5 } = require("uuid");
+const axios = require("axios");
 
 // Must match import-points-venstar.js exactly
-const ROOT_NAMESPACE = 'b9f3c721-4e8a-5d2b-a1f6-3c7e0d9b2f45';
-const LAYER = 'hpl:venstar';
+const ROOT_NAMESPACE = "b9f3c721-4e8a-5d2b-a1f6-3c7e0d9b2f45";
+const LAYER = "hpl:venstar";
 
 /**
- * Venstar ColorTouch — poll-values
- *
- * Runs on a 1-minute schedule. For each registered point in hpl:venstar,
- * fetches fresh data from the appropriate thermostat endpoint and pushes
- * value updates back to Normal Framework.
- *
- * Routing strategy (mirrors Niagara R2 pattern):
- *   Primary:  reads tstatUrl attribute stored on each point during import
- *   Fallback: matches parent_uuid against derived per-tstat namespace
+ * Invoke hook function
+ * @param {NormalSdk.InvokeParams} params
+ * @returns {NormalSdk.InvokeResult}
  */
-module.exports = async (config, points, sdk) => {
-  const baseUrlRaw = config.baseUrl || '';
-  const tstatUrls = baseUrlRaw.split(',').map(u => u.trim()).filter(Boolean);
-  const username = config.username || '';
-  const password = config.password || '';
+module.exports = async ({ sdk, config, points }) => {
+  if (!config.baseUrl) {
+    return NormalSdk.InvokeError("missing baseUrl in configuration");
+  }
 
-  const authOpts = username
-    ? { auth: { username, password } }
-    : {};
+  const tstatUrls = config.baseUrl.split(",").map(u => u.trim()).filter(Boolean);
+  const username = config.username || "";
+  const password = config.password || "";
+
+  const authOpts = username ? { auth: { username, password } } : {};
 
   // Build namespace → tstatUrl fallback map
   const namespaceMap = {};
@@ -32,9 +28,8 @@ module.exports = async (config, points, sdk) => {
     namespaceMap[uuidv5(url, ROOT_NAMESPACE)] = url;
   }
 
-  // Group points by thermostat URL so we make one API call per tstat per source
-  // rather than one HTTP request per point
-  const tstatGroups = {};  // tstatBase → { info: [...], sensors: [...], runtimes: [...] }
+  // Group points by thermostat URL and source endpoint
+  const tstatGroups = {};
 
   for (const point of points) {
     let tstatBase = point.attrs?.tstatUrl?.value;
@@ -42,7 +37,6 @@ module.exports = async (config, points, sdk) => {
       tstatBase = namespaceMap[point.parent_uuid];
     }
     if (!tstatBase) {
-      console.warn(`[venstar] Cannot resolve tstat URL for point ${point.uuid}`);
       continue;
     }
 
@@ -50,7 +44,7 @@ module.exports = async (config, points, sdk) => {
       tstatGroups[tstatBase] = { info: [], sensors: [], runtimes: [] };
     }
 
-    const source = point.attrs?.['venstar/source']?.value || 'info';
+    const source = point.attrs?.["venstar/source"]?.value || "info";
     tstatGroups[tstatBase][source].push(point);
   }
 
@@ -58,7 +52,7 @@ module.exports = async (config, points, sdk) => {
 
   for (const [tstatBase, groups] of Object.entries(tstatGroups)) {
 
-    // ── Fetch /query/info (covers scalar points) ───────────────────────────
+    // ── Fetch /query/info ──────────────────────────────────────────────────
     if (groups.info.length > 0) {
       try {
         const res = await axios.get(`${tstatBase}/query/info`, {
@@ -67,7 +61,6 @@ module.exports = async (config, points, sdk) => {
         });
         const info = res.data;
 
-        // Map of pointKey suffix → value from info response
         const infoValues = {
           [`${tstatBase}/spacetemp`]:    info.spacetemp,
           [`${tstatBase}/heattemp`]:     info.heattemp,
@@ -81,14 +74,14 @@ module.exports = async (config, points, sdk) => {
         };
 
         for (const point of groups.info) {
-          const key = point.attrs?.['venstar/key']?.value;
+          const key = point.attrs?.["venstar/key"]?.value;
           const val = infoValues[key];
           if (val !== undefined && val !== null) {
             updates.push({ uuid: point.uuid, layer: LAYER, value: String(val) });
           }
         }
       } catch (err) {
-        console.error(`[venstar] poll /query/info failed @ ${tstatBase}: ${err.message}`);
+        sdk.logEvent(`[venstar] poll /query/info failed @ ${tstatBase}: ${err.message}`);
       }
     }
 
@@ -102,7 +95,7 @@ module.exports = async (config, points, sdk) => {
         const sensors = res.data?.sensors || [];
 
         for (const point of groups.sensors) {
-          const idx = parseInt(point.attrs?.['venstar/sensorIndex']?.value, 10);
+          const idx = parseInt(point.attrs?.["venstar/sensorIndex"]?.value, 10);
           if (!isNaN(idx) && sensors[idx] !== undefined) {
             const temp = sensors[idx].temp;
             if (temp !== undefined) {
@@ -111,7 +104,7 @@ module.exports = async (config, points, sdk) => {
           }
         }
       } catch (err) {
-        console.error(`[venstar] poll /query/sensors failed @ ${tstatBase}: ${err.message}`);
+        sdk.logEvent(`[venstar] poll /query/sensors failed @ ${tstatBase}: ${err.message}`);
       }
     }
 
@@ -122,24 +115,30 @@ module.exports = async (config, points, sdk) => {
           ...authOpts,
           timeout: 10000,
         });
-        // The API returns an array; the most recent bucket is the last entry
         const runtimes = res.data?.runtimes || [];
         const latest = runtimes[runtimes.length - 1];
 
         if (latest) {
           for (const point of groups.runtimes) {
-            const rk = point.attrs?.['venstar/runtimeKey']?.value;
+            const rk = point.attrs?.["venstar/runtimeKey"]?.value;
             if (rk && latest[rk] !== undefined) {
               updates.push({ uuid: point.uuid, layer: LAYER, value: String(latest[rk]) });
             }
           }
         }
       } catch (err) {
-        console.error(`[venstar] poll /query/runtimes failed @ ${tstatBase}: ${err.message}`);
+        sdk.logEvent(`[venstar] poll /query/runtimes failed @ ${tstatBase}: ${err.message}`);
       }
     }
   }
 
-  if (updates.length) await sdk.updateValues(updates);
-  console.log(`[venstar] Polled ${updates.length}/${points.length} points across ${Object.keys(tstatGroups).length} thermostat(s)`);
+  // ── Batch push value updates ───────────────────────────────────────────
+  const batch_size = 500;
+  for (let i = 0; i < updates.length; i += batch_size) {
+    await sdk.http.post(`http://${process.env.NFURL}/api/v1/point/data`, {
+      updates: updates.slice(i, i + batch_size),
+    }, { timeout: 15000 });
+  }
+
+  sdk.logEvent(`[venstar] Polled ${updates.length}/${points.length} points across ${Object.keys(tstatGroups).length} thermostat(s)`);
 };
