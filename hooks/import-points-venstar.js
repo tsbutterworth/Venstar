@@ -1,9 +1,12 @@
 const NormalSdk = require("@normalframework/applications-sdk");
 const { v5: uuidv5 } = require("uuid");
 const axios = require("axios");
+const fs = require("fs");
+const path = require("path");
 
 const ROOT_NAMESPACE = "b9f3c721-4e8a-5d2b-a1f6-3c7e0d9b2f45";
 const LAYER = "hpl:venstar";
+const DEVICES_FILE = path.join(__dirname, "../venstar-devices.json");
 
 /**
  * Invoke hook function
@@ -11,17 +14,38 @@ const LAYER = "hpl:venstar";
  * @returns {NormalSdk.InvokeResult}
  */
 module.exports = async ({ sdk, config }) => {
-  if (!config.baseUrl) {
-    return NormalSdk.InvokeError("missing baseUrl in configuration");
+  // Load device list from venstar-devices.json
+  // config.baseUrl can still be used to override/add a single device for testing
+  let devices = [];
+  try {
+    const raw = fs.readFileSync(DEVICES_FILE, "utf8");
+    devices = JSON.parse(raw);
+    sdk.logEvent(`[venstar] Loaded ${devices.length} device(s) from venstar-devices.json`);
+  } catch (err) {
+    sdk.logEvent(`[venstar] Could not read venstar-devices.json: ${err.message}`);
   }
 
-  const tstatUrls = config.baseUrl.split(",").map(u => u.trim()).filter(Boolean);
+  // Allow config.baseUrl to add/override devices for testing
+  if (config.baseUrl) {
+    const overrideUrls = config.baseUrl.split(",").map(u => u.trim()).filter(Boolean);
+    for (const url of overrideUrls) {
+      if (!devices.find(d => d.url === url)) {
+        devices.push({ url, name: url });
+      }
+    }
+  }
+
+  if (devices.length === 0) {
+    return NormalSdk.InvokeError("No devices found in venstar-devices.json and no baseUrl configured");
+  }
+
   const username = config.username || "";
   const password = config.password || "";
   const authOpts = username ? { auth: { username, password } } : {};
   const allPoints = [];
 
-  for (const tstatBase of tstatUrls) {
+  for (const device of devices) {
+    const tstatBase = device.url.replace(/\/+$/, "");
     const tstatNamespace = uuidv5(tstatBase, ROOT_NAMESPACE);
 
     let info;
@@ -29,11 +53,12 @@ module.exports = async ({ sdk, config }) => {
       const res = await axios.get(`${tstatBase}/query/info`, { ...authOpts, timeout: 15000 });
       info = res.data;
     } catch (err) {
-      sdk.logEvent(`[venstar] Failed to reach ${tstatBase}/query/info: ${err.message}`);
+      sdk.logEvent(`[venstar] Failed to reach ${tstatBase}: ${err.message}`);
       continue;
     }
 
-    const tstatName = info.name || tstatBase;
+    // Prefer the name from venstar-devices.json, fall back to what the tstat reports
+    const tstatName = device.name || info.name || tstatBase;
     sdk.logEvent(`[venstar] Importing points from: ${tstatName} (${tstatBase})`);
     const tempUnit = info.tempunits === 1 ? "C" : "F";
 
@@ -64,8 +89,7 @@ module.exports = async ({ sdk, config }) => {
     ];
 
     for (const { key, label, units } of infoPoints) {
-      const extraAttrs = units ? { units } : {};
-      allPoints.push(makePoint(key, label, extraAttrs));
+      allPoints.push(makePoint(key, label, units ? { units } : {}));
     }
 
     try {
@@ -75,11 +99,7 @@ module.exports = async ({ sdk, config }) => {
         allPoints.push(makePoint(
           `${tstatBase}/sensors/${idx}/temp`,
           `${tstatName} Sensor: ${sensor.name || idx}`,
-          {
-            "venstar/source":      "sensors",
-            "venstar/sensorIndex": String(idx),
-            units:                 tempUnit,
-          }
+          { "venstar/source": "sensors", "venstar/sensorIndex": String(idx), units: tempUnit }
         ));
       });
       sdk.logEvent(`[venstar] Found ${sensors.length} sensor(s) on ${tstatName}`);
@@ -91,11 +111,7 @@ module.exports = async ({ sdk, config }) => {
       allPoints.push(makePoint(
         `${tstatBase}/runtimes/${rk}`,
         `${tstatName} Runtime ${rk.toUpperCase()}`,
-        {
-          "venstar/source":     "runtimes",
-          "venstar/runtimeKey": rk,
-          units:                "min",
-        }
+        { "venstar/source": "runtimes", "venstar/runtimeKey": rk, units: "min" }
       ));
     }
   }
@@ -107,5 +123,5 @@ module.exports = async ({ sdk, config }) => {
     }, { timeout: 30000 });
   }
 
-  sdk.logEvent(`[venstar] Import complete. ${allPoints.length} points across ${tstatUrls.length} thermostat(s)`);
+  sdk.logEvent(`[venstar] Import complete. ${allPoints.length} points across ${devices.length} thermostat(s)`);
 };
