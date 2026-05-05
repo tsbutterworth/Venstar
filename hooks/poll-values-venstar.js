@@ -6,7 +6,7 @@ const path = require("path");
 
 const ROOT_NAMESPACE = "b9f3c721-4e8a-5d2b-a1f6-3c7e0d9b2f45";
 const LAYER = "hpl:venstar";
-const DEVICES_FILE = path.join(__dirname, "../venstar-devices.json");
+const DEVICES_FILE = path.join(__dirname, "../Venstar-devices.json");
 
 /**
  * Invoke hook function
@@ -14,7 +14,6 @@ const DEVICES_FILE = path.join(__dirname, "../venstar-devices.json");
  * @returns {NormalSdk.InvokeResult}
  */
 module.exports = async ({ sdk, config, points }) => {
-  // Build namespace map from venstar-devices.json + optional config.baseUrl
   let devices = [];
   try {
     const raw = fs.readFileSync(DEVICES_FILE, "utf8");
@@ -42,6 +41,7 @@ module.exports = async ({ sdk, config, points }) => {
     namespaceMap[uuidv5(url, ROOT_NAMESPACE)] = url;
   }
 
+  // Group points by thermostat and source
   const tstatGroups = {};
   for (const point of points) {
     let tstatBase = point.attrs?.tstatUrl;
@@ -53,7 +53,8 @@ module.exports = async ({ sdk, config, points }) => {
     tstatGroups[tstatBase][source].push(point);
   }
 
-  const updates = [];
+  let totalUpdates = 0;
+  const ts = new Date().toISOString();
 
   for (const [tstatBase, groups] of Object.entries(tstatGroups)) {
 
@@ -76,7 +77,12 @@ module.exports = async ({ sdk, config, points }) => {
           const key = point.attrs?.["venstar/key"];
           const val = infoValues[key];
           if (val !== undefined && val !== null) {
-            updates.push({ uuid: point.uuid, layer: LAYER, value: String(val) });
+            await sdk.http.post(`http://${process.env.NFURL}/api/v1/point/data`, {
+              uuid: point.uuid,
+              layer: LAYER,
+              values: [{ ts, real: parseFloat(val) }]
+            }, { timeout: 15000 });
+            totalUpdates++;
           }
         }
       } catch (err) {
@@ -91,7 +97,12 @@ module.exports = async ({ sdk, config, points }) => {
         for (const point of groups.sensors) {
           const idx = parseInt(point.attrs?.["venstar/sensorIndex"], 10);
           if (!isNaN(idx) && sensors[idx]?.temp !== undefined) {
-            updates.push({ uuid: point.uuid, layer: LAYER, value: String(sensors[idx].temp) });
+            await sdk.http.post(`http://${process.env.NFURL}/api/v1/point/data`, {
+              uuid: point.uuid,
+              layer: LAYER,
+              values: [{ ts, real: parseFloat(sensors[idx].temp) }]
+            }, { timeout: 15000 });
+            totalUpdates++;
           }
         }
       } catch (err) {
@@ -108,7 +119,12 @@ module.exports = async ({ sdk, config, points }) => {
           for (const point of groups.runtimes) {
             const rk = point.attrs?.["venstar/runtimeKey"];
             if (rk && latest[rk] !== undefined) {
-              updates.push({ uuid: point.uuid, layer: LAYER, value: String(latest[rk]) });
+              await sdk.http.post(`http://${process.env.NFURL}/api/v1/point/data`, {
+                uuid: point.uuid,
+                layer: LAYER,
+                values: [{ ts, real: parseFloat(latest[rk]) }]
+              }, { timeout: 15000 });
+              totalUpdates++;
             }
           }
         }
@@ -118,12 +134,5 @@ module.exports = async ({ sdk, config, points }) => {
     }
   }
 
-  const batch_size = 500;
-  for (let i = 0; i < updates.length; i += batch_size) {
-    await sdk.http.post(`http://${process.env.NFURL}/api/v1/point/data`, {
-      updates: updates.slice(i, i + batch_size),
-    }, { timeout: 15000 });
-  }
-
-  sdk.logEvent(`[venstar] Polled ${updates.length}/${points.length} points across ${Object.keys(tstatGroups).length} thermostat(s)`);
+  sdk.logEvent(`[venstar] Polled ${totalUpdates}/${points.length} points across ${Object.keys(tstatGroups).length} thermostat(s)`);
 };
