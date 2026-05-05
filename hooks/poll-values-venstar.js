@@ -2,7 +2,6 @@ const NormalSdk = require("@normalframework/applications-sdk");
 const { v5: uuidv5 } = require("uuid");
 const axios = require("axios");
 
-// Must match import-points-venstar.js exactly
 const ROOT_NAMESPACE = "b9f3c721-4e8a-5d2b-a1f6-3c7e0d9b2f45";
 const LAYER = "hpl:venstar";
 
@@ -19,31 +18,20 @@ module.exports = async ({ sdk, config, points }) => {
   const tstatUrls = config.baseUrl.split(",").map(u => u.trim()).filter(Boolean);
   const username = config.username || "";
   const password = config.password || "";
-
   const authOpts = username ? { auth: { username, password } } : {};
 
-  // Build namespace → tstatUrl fallback map
   const namespaceMap = {};
   for (const url of tstatUrls) {
     namespaceMap[uuidv5(url, ROOT_NAMESPACE)] = url;
   }
 
-  // Group points by thermostat URL and source endpoint
   const tstatGroups = {};
-
   for (const point of points) {
     let tstatBase = point.attrs?.tstatUrl?.value;
-    if (!tstatBase && point.parent_uuid) {
-      tstatBase = namespaceMap[point.parent_uuid];
-    }
-    if (!tstatBase) {
-      continue;
-    }
+    if (!tstatBase && point.parent_uuid) tstatBase = namespaceMap[point.parent_uuid];
+    if (!tstatBase) continue;
 
-    if (!tstatGroups[tstatBase]) {
-      tstatGroups[tstatBase] = { info: [], sensors: [], runtimes: [] };
-    }
-
+    if (!tstatGroups[tstatBase]) tstatGroups[tstatBase] = { info: [], sensors: [], runtimes: [] };
     const source = point.attrs?.["venstar/source"]?.value || "info";
     tstatGroups[tstatBase][source].push(point);
   }
@@ -52,15 +40,10 @@ module.exports = async ({ sdk, config, points }) => {
 
   for (const [tstatBase, groups] of Object.entries(tstatGroups)) {
 
-    // ── Fetch /query/info ──────────────────────────────────────────────────
     if (groups.info.length > 0) {
       try {
-        const res = await axios.get(`${tstatBase}/query/info`, {
-          ...authOpts,
-          timeout: 10000,
-        });
+        const res = await axios.get(`${tstatBase}/query/info`, { ...authOpts, timeout: 10000 });
         const info = res.data;
-
         const infoValues = {
           [`${tstatBase}/spacetemp`]:    info.spacetemp,
           [`${tstatBase}/heattemp`]:     info.heattemp,
@@ -72,7 +55,6 @@ module.exports = async ({ sdk, config, points }) => {
           [`${tstatBase}/schedule`]:     info.schedule,
           [`${tstatBase}/schedulepart`]: info.schedulepart,
         };
-
         for (const point of groups.info) {
           const key = point.attrs?.["venstar/key"]?.value;
           const val = infoValues[key];
@@ -85,22 +67,14 @@ module.exports = async ({ sdk, config, points }) => {
       }
     }
 
-    // ── Fetch /query/sensors ───────────────────────────────────────────────
     if (groups.sensors.length > 0) {
       try {
-        const res = await axios.get(`${tstatBase}/query/sensors`, {
-          ...authOpts,
-          timeout: 10000,
-        });
+        const res = await axios.get(`${tstatBase}/query/sensors`, { ...authOpts, timeout: 10000 });
         const sensors = res.data?.sensors || [];
-
         for (const point of groups.sensors) {
           const idx = parseInt(point.attrs?.["venstar/sensorIndex"]?.value, 10);
-          if (!isNaN(idx) && sensors[idx] !== undefined) {
-            const temp = sensors[idx].temp;
-            if (temp !== undefined) {
-              updates.push({ uuid: point.uuid, layer: LAYER, value: String(temp) });
-            }
+          if (!isNaN(idx) && sensors[idx] !== undefined && sensors[idx].temp !== undefined) {
+            updates.push({ uuid: point.uuid, layer: LAYER, value: String(sensors[idx].temp) });
           }
         }
       } catch (err) {
@@ -108,16 +82,11 @@ module.exports = async ({ sdk, config, points }) => {
       }
     }
 
-    // ── Fetch /query/runtimes ──────────────────────────────────────────────
     if (groups.runtimes.length > 0) {
       try {
-        const res = await axios.get(`${tstatBase}/query/runtimes`, {
-          ...authOpts,
-          timeout: 10000,
-        });
+        const res = await axios.get(`${tstatBase}/query/runtimes`, { ...authOpts, timeout: 10000 });
         const runtimes = res.data?.runtimes || [];
         const latest = runtimes[runtimes.length - 1];
-
         if (latest) {
           for (const point of groups.runtimes) {
             const rk = point.attrs?.["venstar/runtimeKey"]?.value;
@@ -132,7 +101,6 @@ module.exports = async ({ sdk, config, points }) => {
     }
   }
 
-  // ── Batch push value updates ───────────────────────────────────────────
   const batch_size = 500;
   for (let i = 0; i < updates.length; i += batch_size) {
     await sdk.http.post(`http://${process.env.NFURL}/api/v1/point/data`, {
