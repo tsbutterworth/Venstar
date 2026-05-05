@@ -35,22 +35,21 @@ module.exports = async ({ sdk, config }) => {
 
     const tstatName = info.name || tstatBase;
     sdk.logEvent(`[venstar] Importing points from: ${tstatName} (${tstatBase})`);
+    const tempUnit = info.tempunits === 1 ? "C" : "F";
 
     const makePoint = (pointKey, displayName, extraAttrs = {}) => ({
       uuid: uuidv5(pointKey, tstatNamespace),
       layer: LAYER,
       parent_uuid: tstatNamespace,
       attrs: {
-        name:             { value: displayName },
-        "venstar/key":    { value: pointKey },
-        "venstar/source": { value: "info" },
-        tstatUrl:         { value: tstatBase },
-        tstatName:        { value: tstatName },
+        name:             displayName,
+        "venstar/key":    pointKey,
+        "venstar/source": "info",
+        tstatUrl:         tstatBase,
+        tstatName:        tstatName,
         ...extraAttrs,
       },
     });
-
-    const tempUnit = info.tempunits === 1 ? "°C" : "°F";
 
     const infoPoints = [
       { key: `${tstatBase}/spacetemp`,    label: `${tstatName} Space Temp`,      units: tempUnit },
@@ -65,7 +64,7 @@ module.exports = async ({ sdk, config }) => {
     ];
 
     for (const { key, label, units } of infoPoints) {
-      const extraAttrs = units ? { units: { value: units } } : {};
+      const extraAttrs = units ? { units } : {};
       allPoints.push(makePoint(key, label, extraAttrs));
     }
 
@@ -77,9 +76,9 @@ module.exports = async ({ sdk, config }) => {
           `${tstatBase}/sensors/${idx}/temp`,
           `${tstatName} Sensor: ${sensor.name || idx}`,
           {
-            "venstar/source":      { value: "sensors" },
-            "venstar/sensorIndex": { value: String(idx) },
-            units:                 { value: tempUnit },
+            "venstar/source":      "sensors",
+            "venstar/sensorIndex": String(idx),
+            units:                 tempUnit,
           }
         ));
       });
@@ -93,9 +92,9 @@ module.exports = async ({ sdk, config }) => {
         `${tstatBase}/runtimes/${rk}`,
         `${tstatName} Runtime ${rk.toUpperCase()}`,
         {
-          "venstar/source":     { value: "runtimes" },
-          "venstar/runtimeKey": { value: rk },
-          units:                { value: "min" },
+          "venstar/source":     "runtimes",
+          "venstar/runtimeKey": rk,
+          units:                "min",
         }
       ));
     }
